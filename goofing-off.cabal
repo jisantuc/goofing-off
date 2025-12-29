@@ -15,10 +15,18 @@ common warnings
 library mosconi-sim-lib
         import:           warnings
         exposed-modules:
-                Lib
+                Match
+                Sim
+                Sim.IO
         
         build-depends:
                 base         ^>=4.20
+                , aeson
+                , containers
+                , lens
+                , random
+                , text
+                , transformers
         
         hs-source-dirs:   src/mosconi-sim
         default-language: Haskell2010
@@ -33,6 +41,8 @@ executable mosconi-sim
                 , mosconi-sim-lib
                 , base                  ^>=4.20
                 , optparse-applicative
+                , random
+                , transformers
         
         hs-source-dirs:   mosconi-sim
         default-language: Haskell2010
