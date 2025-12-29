@@ -15,10 +15,13 @@ common warnings
 library mosconi-sim-lib
         import:           warnings
         exposed-modules:
-                Lib
+                Match
         
         build-depends:
                 base         ^>=4.20
+                , containers
+                , random
+                , text
         
         hs-source-dirs:   src/mosconi-sim
         default-language: Haskell2010
