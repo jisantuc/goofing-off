@@ -16,6 +16,7 @@ library mosconi-sim-lib
         import:           warnings
         exposed-modules:
                 Match
+                Sim
         
         build-depends:
                 base         ^>=4.20
