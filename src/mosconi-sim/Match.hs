@@ -1,12 +1,16 @@
-{-# LANGUAGE DataKinds #-}
-
 module Match
-  ( Schedule,
+  ( Player (..),
+    Schedule,
+    DoublesTeam (..),
     Team (..),
+    Matchup (..),
     makeSchedule,
+    scheduleToList,
+    teamToList,
   )
 where
 
+import Control.Monad.Trans.State.Lazy (State, state)
 import Data.Text (Text)
 import System.Random.Stateful (RandomGen, randomR)
 
@@ -14,28 +18,28 @@ data Player = Player
   { name :: Text,
     rating :: Int
   }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Team = Team Player Player Player Player Player deriving (Eq, Show)
 
-toList :: Team -> [Player]
-toList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
+teamToList :: Team -> [Player]
+teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
 
 data DoublesTeam = DoublesTeam Player Player deriving (Show)
 
-newtype SinglesMatchup = SinglesMatchup (Player, Player) deriving (Show)
-
-newtype DoublesMatchup = DoublesMatchup (DoublesTeam, DoublesTeam) deriving (Show)
-
-newtype TeamMatchup = TeamMatchup (Team, Team) deriving (Eq, Show)
+data Matchup
+  = SinglesMatchup (Player, Player)
+  | DoublesMatchup (DoublesTeam, DoublesTeam)
+  | TeamMatchup (Team, Team)
+  deriving (Show)
 
 -- All players must play at least once in matches 2, 3, and 4.
 data Day1
   = Day1
-      TeamMatchup
-      DoublesMatchup
-      SinglesMatchup
-      DoublesMatchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
   deriving (Show)
 
 -- All players must play at least once in matches 7, 8, and 9.
@@ -44,23 +48,23 @@ data Day1
 -- different from day 1, so I'll include that constraint as well
 data Day2
   = Day2
-      TeamMatchup
-      SinglesMatchup
-      DoublesMatchup
-      SinglesMatchup
-      DoublesMatchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
   deriving (Show)
 
 -- All players must play at least once in matches 12, 13, and 14.
 -- that's the third/fourth/fifth match of the day
 data Day3
   = Day3
-      TeamMatchup
-      SinglesMatchup
-      DoublesMatchup
-      SinglesMatchup
-      DoublesMatchup
-      SinglesMatchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
   deriving (Show)
 
 -- |
@@ -69,12 +73,12 @@ data Day3
 -- player has played once, but really, that's just a guess.
 data Day4
   = Day4
-      SinglesMatchup
-      SinglesMatchup
-      SinglesMatchup
-      SinglesMatchup
-      SinglesMatchup
-      SinglesMatchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
+      Matchup
   deriving (Show)
 
 -- |
@@ -90,9 +94,9 @@ data Schedule
       Day3
       Day4
 
-shuffleTeam :: (RandomGen g) => g -> Team -> (Team, g)
-shuffleTeam gen team =
-  go gen [] (toList team)
+shuffleTeam :: (RandomGen g) => Team -> State g Team
+shuffleTeam team = state $ \gen ->
+  go gen [] (teamToList team)
   where
     go g [p1', p2', p3', p4', p5'] _ = (Team p1' p2' p3' p4' p5', g)
     go g acc rest =
@@ -101,71 +105,101 @@ shuffleTeam gen team =
           selected = rest !! idx
        in go g' (acc <> [selected]) (filter (/= selected) rest)
 
-singlesMatchup :: (RandomGen g) => g -> Team -> Team -> (SinglesMatchup, g)
-singlesMatchup gen teamA teamB =
+singlesMatchup :: (RandomGen g) => Team -> Team -> State g Matchup
+singlesMatchup teamA teamB = state $ \gen ->
   let (idx1, g') = randomR (0, 4) gen
       (idx2, g'') = randomR (0, 4) g'
-   in (SinglesMatchup (toList teamA !! idx1, toList teamB !! idx2), g'')
+   in (SinglesMatchup (teamToList teamA !! idx1, teamToList teamB !! idx2), g'')
 
 -- |
 --  In principle this doesn't have to go doubles / singles / doubles, but in the rules that's the order that
 --  the constraint always shows up in 🤷
-exhaustiveMatchSeq :: (RandomGen g) => g -> Team -> Team -> ((DoublesMatchup, SinglesMatchup, DoublesMatchup), g)
-exhaustiveMatchSeq gen teamA teamB =
-  let (Team a1' a2' a3' a4' a5', g') = shuffleTeam gen teamA
-      (Team b1' b2' b3' b4' b5', g'') = shuffleTeam g' teamB
-   in ( ( DoublesMatchup (DoublesTeam a1' a2', DoublesTeam b1' b2'),
-          SinglesMatchup (a3', b3'),
-          DoublesMatchup ((DoublesTeam a4' a5'), (DoublesTeam b4' b5'))
-        ),
-        g''
+exhaustiveMatchSeq :: (RandomGen g) => Team -> Team -> State g (Matchup, Matchup, Matchup)
+exhaustiveMatchSeq teamA teamB =
+  do
+    (Team a1' a2' a3' a4' a5') <- shuffleTeam teamA
+    (Team b1' b2' b3' b4' b5') <- shuffleTeam teamB
+    pure
+      ( DoublesMatchup (DoublesTeam a1' a2', DoublesTeam b1' b2'),
+        SinglesMatchup (a3', b3'),
+        DoublesMatchup ((DoublesTeam a4' a5'), (DoublesTeam b4' b5'))
       )
 
-makeDay1 :: (RandomGen g) => g -> Team -> Team -> (Day1, g)
-makeDay1 gen teamA teamB =
-  let (teamMatchOrderA, g') = shuffleTeam gen teamA
-      (teamMatchOrderB, g'') = shuffleTeam g' teamB
-      ((doubles1, singles, doubles2), g''') = exhaustiveMatchSeq g'' teamA teamB
-   in (Day1 (TeamMatchup (teamMatchOrderA, teamMatchOrderB)) doubles1 singles doubles2, g''')
+makeDay1 :: (RandomGen g) => Team -> Team -> State g Day1
+makeDay1 teamA teamB = do
+  teamMatchOrderA <- shuffleTeam teamA
+  teamMatchOrderB <- shuffleTeam teamB
+  (doubles1, singles, doubles2) <- exhaustiveMatchSeq teamA teamB
+  pure $ Day1 (TeamMatchup (teamMatchOrderA, teamMatchOrderB)) doubles1 singles doubles2
 
-makeDay2 :: (RandomGen g) => g -> Team -> Team -> (Day2, g)
-makeDay2 gen teamA teamB =
-  let (shuffledA, g') = shuffleTeam gen teamA
-      (shuffledB, g'') = shuffleTeam g' teamB
-      teamMatch = TeamMatchup (shuffledA, shuffledB)
-      (singles1, g''') = singlesMatchup g'' teamA teamB
-      ((doubles1, singles2, doubles2), g'''') = exhaustiveMatchSeq g''' teamA teamB
-   in (Day2 teamMatch singles1 doubles1 singles2 doubles2, g'''')
+makeDay2 :: (RandomGen g) => Team -> Team -> State g Day2
+makeDay2 teamA teamB = do
+  shuffledA <- shuffleTeam teamA
+  shuffledB <- shuffleTeam teamB
+  let teamMatch = TeamMatchup (shuffledA, shuffledB)
+  singles1 <- singlesMatchup teamA teamB
+  (doubles1, singles2, doubles2) <- exhaustiveMatchSeq teamA teamB
+  pure $ Day2 teamMatch singles1 doubles1 singles2 doubles2
 
-makeDay3 :: (RandomGen g) => g -> Team -> Team -> (Day3, g)
-makeDay3 gen teamA teamB =
-  let (shuffledA, g') = shuffleTeam gen teamA
-      (shuffledB, g'') = shuffleTeam g' teamB
-      teamMatch = TeamMatchup (shuffledA, shuffledB)
-      (singles1, g''') = singlesMatchup g'' teamA teamB
-      ((doubles1, singles2, doubles2), g'''') = exhaustiveMatchSeq g''' teamA teamB
-      (singles3, g''''') = singlesMatchup g'''' teamA teamB
-   in (Day3 teamMatch singles1 doubles1 singles2 doubles2 singles3, g''''')
+makeDay3 :: (RandomGen g) => Team -> Team -> State g Day3
+makeDay3 teamA teamB = do
+  shuffledA <- shuffleTeam teamA
+  shuffledB <- shuffleTeam teamB
+  let teamMatch = TeamMatchup (shuffledA, shuffledB)
+  singles1 <- singlesMatchup teamA teamB
+  (doubles1, singles2, doubles2) <- exhaustiveMatchSeq teamA teamB
+  singles3 <- singlesMatchup teamA teamB
+  pure $ Day3 teamMatch singles1 doubles1 singles2 doubles2 singles3
 
-makeDay4 :: (RandomGen g) => g -> Team -> Team -> (Day4, g)
-makeDay4 gen teamA teamB =
-  let (Team a1 a2 a3 a4 a5, g') = shuffleTeam gen teamA
-      (Team b1 b2 b3 b4 b5, g'') = shuffleTeam g' teamB
-      (captainsPick, g''') = singlesMatchup g'' teamA teamB
-   in ( Day4
-          (SinglesMatchup (a1, b1))
-          (SinglesMatchup (a2, b2))
-          (SinglesMatchup (a3, b3))
-          (SinglesMatchup (a4, b4))
-          (SinglesMatchup (a5, b5))
-          captainsPick,
-        g'''
-      )
+makeDay4 :: (RandomGen g) => Team -> Team -> State g Day4
+makeDay4 teamA teamB = do
+  Team a1 a2 a3 a4 a5 <- shuffleTeam teamA
+  Team b1 b2 b3 b4 b5 <- shuffleTeam teamB
+  captainsPick <- singlesMatchup teamA teamB
+  pure $
+    Day4
+      (SinglesMatchup (a1, b1))
+      (SinglesMatchup (a2, b2))
+      (SinglesMatchup (a3, b3))
+      (SinglesMatchup (a4, b4))
+      (SinglesMatchup (a5, b5))
+      captainsPick
 
-makeSchedule :: (RandomGen g) => g -> Team -> Team -> Schedule
-makeSchedule gen teamA teamB =
-  let (day1, g') = makeDay1 gen teamA teamB
-      (day2, g'') = makeDay2 g' teamA teamB
-      (day3, g''') = makeDay3 g'' teamA teamB
-      (day4, _) = makeDay4 g''' teamA teamB
-   in Schedule day1 day2 day3 day4
+makeSchedule :: (RandomGen g) => Team -> Team -> State g Schedule
+makeSchedule teamA teamB = do
+  day1 <- makeDay1 teamA teamB
+  day2 <- makeDay2 teamA teamB
+  day3 <- makeDay3 teamA teamB
+  day4 <- makeDay4 teamA teamB
+  pure $ Schedule day1 day2 day3 day4
+
+scheduleToList :: Schedule -> [Matchup]
+scheduleToList
+  ( Schedule
+      (Day1 m1 m2 m3 m4)
+      (Day2 m5 m6 m7 m8 m9)
+      (Day3 m10 m11 m12 m13 m14 m15)
+      (Day4 m16 m17 m18 m19 m20 m21)
+    ) =
+    [ m1,
+      m2,
+      m3,
+      m4,
+      m5,
+      m6,
+      m7,
+      m8,
+      m9,
+      m10,
+      m11,
+      m12,
+      m13,
+      m14,
+      m15,
+      m16,
+      m17,
+      m18,
+      m19,
+      m20,
+      m21
+    ]
