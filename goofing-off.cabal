@@ -20,6 +20,7 @@ library mosconi-sim-lib
         
         build-depends:
                 base         ^>=4.20
+                , aeson
                 , containers
                 , random
                 , text

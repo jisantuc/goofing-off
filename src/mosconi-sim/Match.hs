@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Match
   ( Player (..),
     Schedule,
@@ -13,12 +15,16 @@ where
 import Control.Monad.Trans.State.Lazy (State, state)
 import Data.Text (Text)
 import System.Random.Stateful (RandomGen, randomR)
+import GHC.Generics (Generic)
+import Data.Aeson (FromJSON)
 
 data Player = Player
   { name :: Text,
     rating :: Int
   }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Generic, Ord, Show)
+
+instance FromJSON Player
 
 data Team = Team Player Player Player Player Player deriving (Eq, Show)
 
