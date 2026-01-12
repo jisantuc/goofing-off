@@ -35,6 +35,8 @@ data MosconiSimConfig = MosconiSimConfig
 -- e.g. mosconi-sim single --seed 1234 --trials 1234
 --   vs.
 -- mosconi-sim many --seed 1234 --trials 1234 --schedules 1234
+-- see Commands:
+-- https://hackage.haskell.org/package/optparse-applicative#commands
 simCountParser :: Parser SimCount
 simCountParser =
   let trialsOpt = option auto (long "trials" <> metavar "TRIAL_COUNT" <> value 1000)
@@ -56,8 +58,10 @@ configParser =
 -- options:
 -- --single [seed] to run one sim
 -- --many [how many|100] for lots of sims
--- --output FILE to write results to a file (just winner/score for now)
--- some way of configuring players/ratings
+-- --output FILE to write results to a file; where "results" is something like schedule hash + USA win rate + USA mean racks won
+-- maybe want full output in sqlite or something; sqlite would be nice for
+-- including some interactive visualization in a blog, but also chonkier 🤔
+-- TODO: some way of configuring players/ratings -- json file inputs for now
 main :: IO ()
 main =
   execParser opts >>= print
