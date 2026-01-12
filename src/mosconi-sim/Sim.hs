@@ -3,7 +3,13 @@
 
 module Sim (runMosconi, MosconiTeam (..), losingTeamMatchesWon) where
 
+import Control.Lens ((%~))
+import Control.Lens.At (ix)
+import Control.Lens.Tuple (_1, _2)
 import Control.Monad.Trans.State.Lazy (State, state)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Monoid (Sum (..))
 import Match
   ( DoublesTeam (..),
     Matchup (..),
@@ -17,15 +23,23 @@ import System.Random (RandomGen, randoms, split)
 
 data MosconiTeam = USA Team | Europe Team deriving (Eq, Show)
 
+recordLoss :: Player -> Map Player (Sum Int, Sum Int) -> Map Player (Sum Int, Sum Int)
+recordLoss p m = (ix p . _2) %~ (+ 1) $ m
+
+recordWin :: Player -> Map Player (Sum Int, Sum Int) -> Map Player (Sum Int, Sum Int)
+recordWin p m = (ix p . _1) %~ (+ 1) $ m
+
 data MosconiResult = MosconiResult
   { winner :: MosconiTeam,
-    losingTeamMatchesWon :: Int
+    losingTeamMatchesWon :: Int,
+    playerRecords :: [(Player, Int, Int)]
   }
   deriving (Show)
 
 data SimState = SimState
   { aWins :: Int,
     bWins :: Int,
+    playerWinLoss :: Map Player (Sum Int, Sum Int),
     teamA :: MosconiTeam,
     teamB :: MosconiTeam
   }
@@ -38,11 +52,14 @@ data PlayerRecord = PlayerRecord
   }
   deriving (Show)
 
-newtype MatchupResult = MatchupResult
-  {winningTeam :: MosconiTeam}
+data MatchupResult = MatchupResult
+  { winningTeam :: MosconiTeam,
+    winningPlayers :: [Player],
+    losingPlayers :: [Player]
+  }
 
 initSimState :: MosconiTeam -> MosconiTeam -> SimState
-initSimState = SimState 0 0
+initSimState = SimState 0 0 mempty
 
 winProbabilityForRatings :: (Floating a) => a -> a -> a
 winProbabilityForRatings aRating bRating =
@@ -83,8 +100,12 @@ pickWinner a b matchup = state $ \g ->
   let (genForThisMatch, genForRest) = split g
    in go genForRest (initSimState a b) (zip (perRackWinProbability matchup) (randoms genForThisMatch))
   where
+    (aPlayers, bPlayers) = case matchup of
+      SinglesMatchup (aPlayer, bPlayer) -> ([aPlayer], [bPlayer])
+      DoublesMatchup (DoublesTeam a1 a2, DoublesTeam b1 b2) -> ([a1, a2], [b1, b2])
+      TeamMatchup (_, _) -> ([], [])
     -- this is impossible, since the function is called with two infinite lists, but oh well
-    go nextGenerator _ [] = (MatchupResult a, nextGenerator)
+    go nextGenerator _ [] = (MatchupResult a [] [], nextGenerator)
     go nextGenerator matchupState ((aWinProbability, dieRoll) : xs) =
       let nextState =
             if dieRoll < aWinProbability
@@ -99,8 +120,8 @@ pickWinner a b matchup = state $ \g ->
             Just t ->
               if t == a
                 then
-                  (MatchupResult t, nextGenerator)
-                else (MatchupResult t, nextGenerator)
+                  (MatchupResult t aPlayers bPlayers, nextGenerator)
+                else (MatchupResult t bPlayers aPlayers, nextGenerator)
             Nothing ->
               go nextGenerator nextState xs
 
@@ -109,14 +130,38 @@ runMosconi :: (RandomGen g) => MosconiTeam -> MosconiTeam -> Schedule -> State g
 runMosconi a b schedule =
   go (initSimState a b) (scheduleToList schedule)
   where
-    go (SimState {aWins = 11, teamA, bWins}) _ = pure $ MosconiResult teamA bWins
-    go (SimState {bWins = 11, teamB, aWins}) _ = pure $ MosconiResult teamB aWins
+    playerWinLossToRecords = ((\(k, (w, l)) -> (k, getSum w, getSum l)) <$>) . Map.toList
+    go (SimState {aWins = 11, teamA, bWins, playerWinLoss}) _ =
+      pure $ MosconiResult teamA bWins (playerWinLossToRecords playerWinLoss)
+    go (SimState {bWins = 11, teamB, aWins, playerWinLoss}) _ =
+      pure $ MosconiResult teamB aWins (playerWinLossToRecords playerWinLoss)
     -- also impossible I think? again, oh well
-    go (SimState {teamA, teamB, aWins, bWins}) [] =
+    go (SimState {teamA, teamB, aWins, bWins, playerWinLoss}) [] =
       let (winner', loserMatchupWins) = if aWins > bWins then (teamA, bWins) else (teamB, aWins)
-       in pure $ MosconiResult winner' loserMatchupWins
-    go (SimState {teamA, teamB, aWins, bWins}) (matchup : matchups) =
+       in pure $ MosconiResult winner' loserMatchupWins (playerWinLossToRecords playerWinLoss)
+    go (SimState {teamA, teamB, aWins, bWins, playerWinLoss}) (matchup : matchups) =
       do
-        MatchupResult {winningTeam} <- pickWinner teamA teamB matchup
-        let nextState = if winningTeam == teamA then (SimState {aWins = aWins + 1, bWins, teamA, teamB}) else (SimState {bWins = bWins + 1, aWins, teamA, teamB})
+        MatchupResult {winningTeam, winningPlayers, losingPlayers} <- pickWinner teamA teamB matchup
+        let withWins = foldMap (`recordWin` playerWinLoss) winningPlayers
+        let withWinsLosses = foldMap (`recordLoss` withWins) losingPlayers
+        let nextState =
+              if winningTeam == teamA
+                then
+                  ( SimState
+                      { aWins = aWins + 1,
+                        bWins,
+                        teamA,
+                        teamB,
+                        playerWinLoss = withWinsLosses
+                      }
+                  )
+                else
+                  ( SimState
+                      { bWins = bWins + 1,
+                        aWins,
+                        teamA,
+                        teamB,
+                        playerWinLoss = withWinsLosses
+                      }
+                  )
         go nextState matchups

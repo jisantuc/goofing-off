@@ -22,6 +22,7 @@ library mosconi-sim-lib
                 base         ^>=4.20
                 , aeson
                 , containers
+                , lens
                 , random
                 , text
                 , transformers
