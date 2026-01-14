@@ -5,6 +5,8 @@
 module Main (main) where
 
 import Control.Applicative (optional)
+import Control.Monad.Trans.State (runState)
+import Match (makeSchedule)
 import Options.Applicative
   ( Parser,
     auto,
@@ -23,11 +25,13 @@ import Options.Applicative
     value,
     (<**>),
   )
+import Sim (MosconiTeam (..), runMosconi)
 import Sim.IO (loadTeamFromJson)
+import System.Random (getStdGen, mkStdGen)
 
 data SimMode
-  = Single {seed :: Maybe Int, trials :: Int}
-  | Many {seed :: Maybe Int, trials :: Int, schedules :: Int}
+  = Single {trials :: Int}
+  | Many {trials :: Int, schedules :: Int}
   deriving (Show)
 
 data TeamPaths = TeamPaths
@@ -38,6 +42,7 @@ data TeamPaths = TeamPaths
 
 data MosconiSimConfig = MosconiSimConfig
   { teamPaths :: TeamPaths,
+    seed :: Maybe Int,
     simMode :: SimMode
   }
   deriving (Show)
@@ -65,15 +70,16 @@ singleScheduleSimParser :: Parser MosconiSimConfig
 singleScheduleSimParser =
   MosconiSimConfig
     <$> teamPathsParser
-    <*> (Single <$> seedParser <*> numTrialsPerScheduleParser)
+    <*> seedParser
+    <*> (Single <$> numTrialsPerScheduleParser)
 
 manySchedulesSimParser :: Parser MosconiSimConfig
 manySchedulesSimParser =
   MosconiSimConfig
     <$> teamPathsParser
+    <*> seedParser
     <*> ( Many
-            <$> seedParser
-            <*> numTrialsPerScheduleParser
+            <$> numTrialsPerScheduleParser
             <*> option
               auto
               ( long "num-schedules"
@@ -90,7 +96,7 @@ manySchedulesSimParser =
 main :: IO ()
 main =
   execParser opts >>= \case
-    MosconiSimConfig {teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath}, simMode} -> do
+    MosconiSimConfig {teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath}, seed, simMode} -> do
       teamUsaParseResult <- loadTeamFromJson teamUSAJsonFilePath
       teamUsa <-
         either
@@ -98,12 +104,25 @@ main =
           (\t -> pure t)
           teamUsaParseResult
       teamEuropeParseResult <- loadTeamFromJson teamEuropeJsonFilePath
-      teamEurope <- either
+      teamEurope <-
+        either
           (\err -> fail ("Could not parse Team Europe: " <> err))
           (\t -> pure t)
           teamEuropeParseResult
-      print teamUsa
-      print teamEurope
+      stdGen <- maybe getStdGen (pure . mkStdGen) seed
+      -- TODO:
+      -- branch on which sim mode
+      -- get results
+      -- write the output file (you know, whatever that looks like)
+      let result =
+            runState
+              ( do
+                  schedule <- makeSchedule teamUsa teamEurope
+                  mosconiResult <- runMosconi (USA teamUsa) (Europe teamEurope) schedule
+                  pure (schedule, mosconiResult)
+              )
+              stdGen
+      print . snd . fst $ result
   where
     cmdParser =
       hsubparser
