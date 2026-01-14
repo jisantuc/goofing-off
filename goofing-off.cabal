@@ -17,6 +17,7 @@ library mosconi-sim-lib
         exposed-modules:
                 Match
                 Sim
+                Sim.IO
         
         build-depends:
                 base         ^>=4.20
