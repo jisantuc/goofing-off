@@ -28,8 +28,6 @@ instance FromJSON Player
 
 data Team = Team Player Player Player Player Player deriving (Eq, Show)
 
--- TODO: FromJSON expecting right number of values
-
 teamToList :: Team -> [Player]
 teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
 
