@@ -13,10 +13,10 @@ module Match
 where
 
 import Control.Monad.Trans.State.Lazy (State, state)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
-import System.Random.Stateful (RandomGen, randomR)
 import GHC.Generics (Generic)
-import Data.Aeson (FromJSON)
+import System.Random.Stateful (RandomGen, randomR)
 
 data Player = Player
   { name :: Text,
@@ -26,27 +26,38 @@ data Player = Player
 
 instance FromJSON Player
 
-data Team = Team Player Player Player Player Player deriving (Eq, Show)
+instance ToJSON Player
+
+data Team = Team Player Player Player Player Player deriving (Eq, Show, Generic)
+
+instance ToJSON Team
 
 teamToList :: Team -> [Player]
 teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
 
-data DoublesTeam = DoublesTeam Player Player deriving (Show)
+data DoublesTeam = DoublesTeam Player Player deriving (Show, Generic)
+
+instance ToJSON DoublesTeam
 
 data Matchup
   = SinglesMatchup (Player, Player)
   | DoublesMatchup (DoublesTeam, DoublesTeam)
   | TeamMatchup (Team, Team)
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON Matchup
 
 -- All players must play at least once in matches 2, 3, and 4.
 data Day1
   = Day1
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-  deriving (Show)
+  { match1 :: Matchup,
+    match2 :: Matchup,
+    match3 :: Matchup,
+    match4 :: Matchup
+  }
+  deriving (Show, Generic)
+
+instance ToJSON Day1
 
 -- All players must play at least once in matches 7, 8, and 9.
 -- third/fourth/fifth match of the day
@@ -54,24 +65,30 @@ data Day1
 -- different from day 1, so I'll include that constraint as well
 data Day2
   = Day2
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-  deriving (Show)
+  { match5 :: Matchup,
+    match6 :: Matchup,
+    match7 :: Matchup,
+    match8 :: Matchup,
+    match9 :: Matchup
+  }
+  deriving (Generic, Show)
+
+instance ToJSON Day2
 
 -- All players must play at least once in matches 12, 13, and 14.
 -- that's the third/fourth/fifth match of the day
 data Day3
   = Day3
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-  deriving (Show)
+  { match10 :: Matchup,
+    match11 :: Matchup,
+    match12 :: Matchup,
+    match13 :: Matchup,
+    match14 :: Matchup,
+    match15 :: Matchup
+  }
+  deriving (Generic, Show)
+
+instance ToJSON Day3
 
 -- |
 -- "Each player must play one singles match before playing again."
@@ -79,13 +96,16 @@ data Day3
 -- player has played once, but really, that's just a guess.
 data Day4
   = Day4
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-      Matchup
-  deriving (Show)
+  { match16 :: Matchup,
+    match17 :: Matchup,
+    match18 :: Matchup,
+    match19 :: Matchup,
+    match20 :: Matchup,
+    match21 :: Matchup
+  }
+  deriving (Generic, Show)
+
+instance ToJSON Day4
 
 -- |
 -- - One issue is, this isn't really foldable, so keeping track of
@@ -99,6 +119,9 @@ data Schedule
       Day2
       Day3
       Day4
+  deriving (Generic)
+
+instance ToJSON Schedule
 
 shuffleTeam :: (RandomGen g) => Team -> State g Team
 shuffleTeam team = state $ \gen ->

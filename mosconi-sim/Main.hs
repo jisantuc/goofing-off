@@ -5,7 +5,8 @@
 module Main (main) where
 
 import Control.Applicative (optional)
-import Control.Monad.Trans.State (runState)
+import Control.Monad (replicateM)
+import Control.Monad.Trans.State (evalState)
 import Match (makeSchedule)
 import Options.Applicative
   ( Parser,
@@ -20,13 +21,19 @@ import Options.Applicative
     metavar,
     option,
     progDesc,
+    short,
     showDefault,
     str,
     value,
     (<**>),
   )
-import Sim (MosconiTeam (..), runMosconi)
-import Sim.IO (loadTeamFromJson)
+import Sim
+  ( MosconiTeam (..),
+    ScheduleSummary (..),
+    SimSummary (..),
+    runMosconi,
+  )
+import Sim.IO (loadTeamFromJson, writeResults)
 import System.Random (getStdGen, mkStdGen)
 
 data SimMode
@@ -43,6 +50,7 @@ data TeamPaths = TeamPaths
 data MosconiSimConfig = MosconiSimConfig
   { teamPaths :: TeamPaths,
     seed :: Maybe Int,
+    outFile :: FilePath,
     simMode :: SimMode
   }
   deriving (Show)
@@ -63,6 +71,10 @@ numTrialsPerScheduleParser =
         <> showDefault
     )
 
+outFileParser :: Parser FilePath
+outFileParser =
+  option str (long "out" <> short 'o' <> metavar "OUTPUT_FILE")
+
 seedParser :: Parser (Maybe Int)
 seedParser = optional $ option auto (long "seed" <> metavar "SEED")
 
@@ -71,6 +83,7 @@ singleScheduleSimParser =
   MosconiSimConfig
     <$> teamPathsParser
     <*> seedParser
+    <*> outFileParser
     <*> (Single <$> numTrialsPerScheduleParser)
 
 manySchedulesSimParser :: Parser MosconiSimConfig
@@ -78,6 +91,7 @@ manySchedulesSimParser =
   MosconiSimConfig
     <$> teamPathsParser
     <*> seedParser
+    <*> outFileParser
     <*> ( Many
             <$> numTrialsPerScheduleParser
             <*> option
@@ -96,7 +110,7 @@ manySchedulesSimParser =
 main :: IO ()
 main =
   execParser opts >>= \case
-    MosconiSimConfig {teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath}, seed, simMode} -> do
+    MosconiSimConfig {teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath}, outFile, seed, simMode} -> do
       teamUsaParseResult <- loadTeamFromJson teamUSAJsonFilePath
       teamUsa <-
         either
@@ -110,19 +124,20 @@ main =
           (\t -> pure t)
           teamEuropeParseResult
       stdGen <- maybe getStdGen (pure . mkStdGen) seed
-      -- TODO:
-      -- branch on which sim mode
-      -- get results
-      -- write the output file (you know, whatever that looks like)
-      let result =
-            runState
-              ( do
-                  schedule <- makeSchedule teamUsa teamEurope
-                  mosconiResult <- runMosconi (USA teamUsa) (Europe teamEurope) schedule
-                  pure (schedule, mosconiResult)
+      let (nTrials, nSchedules) = case simMode of
+            Single {trials} -> (trials, 1)
+            Many {trials, schedules} -> (trials, schedules)
+      let results =
+            SimSummary teamUsa teamEurope $
+              ( evalState
+                  ( replicateM nSchedules $ do
+                      schedule <- makeSchedule teamUsa teamEurope
+                      mosconiResults <- replicateM nTrials $ runMosconi (USA teamUsa) (Europe teamEurope) schedule
+                      pure (ScheduleSummary schedule mosconiResults)
+                  )
+                  stdGen
               )
-              stdGen
-      print . snd . fst $ result
+      writeResults outFile results
   where
     cmdParser =
       hsubparser

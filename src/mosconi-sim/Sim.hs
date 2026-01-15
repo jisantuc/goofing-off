@@ -1,15 +1,26 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Sim (runMosconi, MosconiTeam (..), losingTeamMatchesWon) where
+module Sim
+  ( losingTeamMatchesWon,
+    runMosconi,
+    MosconiResult,
+    MosconiTeam (..),
+    ScheduleSummary (..),
+    SimSummary (..),
+  )
+where
 
 import Control.Lens ((%~))
 import Control.Lens.At (ix)
 import Control.Lens.Tuple (_1, _2)
 import Control.Monad.Trans.State.Lazy (State, state)
+import Data.Aeson.Types (ToJSON)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid (Sum (..))
+import GHC.Generics (Generic)
 import Match
   ( DoublesTeam (..),
     Matchup (..),
@@ -21,7 +32,9 @@ import Match
   )
 import System.Random (RandomGen, randoms, split)
 
-data MosconiTeam = USA Team | Europe Team deriving (Eq, Show)
+data MosconiTeam = USA Team | Europe Team deriving (Eq, Generic, Show)
+
+instance ToJSON MosconiTeam
 
 recordLoss :: Player -> Map Player (Sum Int, Sum Int) -> Map Player (Sum Int, Sum Int)
 recordLoss p m = (ix p . _2) %~ (+ 1) $ m
@@ -34,7 +47,26 @@ data MosconiResult = MosconiResult
     losingTeamMatchesWon :: Int,
     playerRecords :: [(Player, Int, Int)]
   }
-  deriving (Show)
+  deriving (Generic, Show)
+
+instance ToJSON MosconiResult
+
+data ScheduleSummary = ScheduleSummary
+  { schedule :: Schedule,
+    results :: [MosconiResult]
+  }
+  deriving (Generic)
+
+instance ToJSON ScheduleSummary
+
+data SimSummary = SimSummary
+  { teamUsa :: Team,
+    teamEurope :: Team,
+    summaries :: [ScheduleSummary]
+  }
+  deriving (Generic)
+
+instance ToJSON SimSummary
 
 data SimState = SimState
   { aWins :: Int,
