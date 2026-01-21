@@ -16,6 +16,7 @@
             cabal-gild
             cabal-install
             haskell-language-server
+            hls-hlint-plugin
             hlint
             ormolu
           ];
