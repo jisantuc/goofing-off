@@ -7,7 +7,7 @@ module Main (main) where
 import Control.Applicative (optional)
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (evalState)
-import Match (makeSchedule)
+import ScheduleGen (makeSchedule)
 import Options.Applicative
   ( Parser,
     auto,

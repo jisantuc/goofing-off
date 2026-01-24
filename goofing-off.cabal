@@ -15,7 +15,7 @@ common warnings
 library mosconi-sim-lib
         import:           warnings
         exposed-modules:
-                Match
+                ScheduleGen
                 Sim
                 Sim.IO
         
@@ -24,11 +24,26 @@ library mosconi-sim-lib
                 , aeson
                 , containers
                 , lens
+                , mosconi-sim-models
                 , random
                 , text
                 , transformers
         
         hs-source-dirs:   src/mosconi-sim
+        default-language: Haskell2010
+
+library mosconi-sim-models
+        import:           warnings
+        exposed-modules:
+                Match
+        
+        build-depends:
+                base         ^>=4.20
+                , aeson
+                , containers
+                , text
+        
+        hs-source-dirs:   src/mosconi-sim-models
         default-language: Haskell2010
 
 executable mosconi-sim

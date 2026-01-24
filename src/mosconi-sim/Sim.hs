@@ -31,6 +31,7 @@ import Match
     teamToList,
   )
 import System.Random (RandomGen, randoms, split)
+import System.Random.Stateful (RandomGen, randomR)
 
 data MosconiTeam = USA Team | Europe Team deriving (Eq, Generic, Show)
 
