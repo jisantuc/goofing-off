@@ -5,6 +5,8 @@
 module Sim
   ( losingTeamMatchesWon,
     runMosconi,
+    recordLoss,
+    recordWin,
     MosconiResult,
     MosconiTeam (..),
     ScheduleSummary (..),
@@ -12,11 +14,9 @@ module Sim
   )
 where
 
-import Control.Lens ((%~))
-import Control.Lens.At (ix)
-import Control.Lens.Tuple (_1, _2)
+import Control.Lens (at, (%~), (&))
 import Control.Monad.Trans.State.Lazy (State, state)
-import Data.Aeson.Types (ToJSON)
+import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid (Sum (..))
@@ -36,11 +36,7 @@ data MosconiTeam = USA Team | Europe Team deriving (Eq, Generic, Show)
 
 instance ToJSON MosconiTeam
 
-recordLoss :: Player -> Map Player (Sum Int, Sum Int) -> Map Player (Sum Int, Sum Int)
-recordLoss p m = (ix p . _2) %~ (+ 1) $ m
-
-recordWin :: Player -> Map Player (Sum Int, Sum Int) -> Map Player (Sum Int, Sum Int)
-recordWin p m = (ix p . _1) %~ (+ 1) $ m
+instance FromJSON MosconiTeam
 
 data MosconiResult = MosconiResult
   { winner :: MosconiTeam,
@@ -51,6 +47,8 @@ data MosconiResult = MosconiResult
 
 instance ToJSON MosconiResult
 
+instance FromJSON MosconiResult
+
 data ScheduleSummary = ScheduleSummary
   { schedule :: Schedule,
     results :: [MosconiResult]
@@ -58,6 +56,8 @@ data ScheduleSummary = ScheduleSummary
   deriving (Generic)
 
 instance ToJSON ScheduleSummary
+
+instance FromJSON ScheduleSummary
 
 data SimSummary = SimSummary
   { teamUsa :: Team,
@@ -67,6 +67,8 @@ data SimSummary = SimSummary
   deriving (Generic)
 
 instance ToJSON SimSummary
+
+instance FromJSON SimSummary
 
 data SimState = SimState
   { aWins :: Int,
@@ -89,6 +91,24 @@ data MatchupResult = MatchupResult
     winningPlayers :: [Player],
     losingPlayers :: [Player]
   }
+
+recordLoss :: Map Player (Sum Int, Sum Int) -> Player -> Map Player (Sum Int, Sum Int)
+recordLoss m p =
+  m
+    & at p
+      %~ ( \case
+             Nothing -> Just (mempty, Sum 1)
+             Just (wins, n) -> Just (wins, n + 1)
+         )
+
+recordWin :: Map Player (Sum Int, Sum Int) -> Player -> Map Player (Sum Int, Sum Int)
+recordWin m p =
+  m
+    & at p
+      %~ ( \case
+             Nothing -> Just (Sum 1, mempty)
+             Just (n, losses) -> Just (n + 1, losses)
+         )
 
 initSimState :: MosconiTeam -> MosconiTeam -> SimState
 initSimState = SimState 0 0 mempty
@@ -117,9 +137,14 @@ perRackWinProbability
   (SinglesMatchup (Player {rating = aRating}, Player {rating = bRating})) =
     repeat $ winProbabilityForRatings (fromIntegral aRating) (fromIntegral bRating)
 perRackWinProbability (DoublesMatchup (DoublesTeam a1 a2, DoublesTeam b1 b2)) =
-  let aRating = fromIntegral (rating a1 + rating a2) / 2
-      bRating = fromIntegral (rating b1 + rating b2) / 2
-   in repeat $ winProbabilityForRatings aRating bRating
+  let aWinProbability =
+        sum
+          [ winProbabilityForRatings (fromIntegral a) (fromIntegral b)
+          | a <- [rating a1, rating a2],
+            b <- [rating b1, rating b2]
+          ]
+          / 4
+   in repeat aWinProbability
 -- reasonable test case -- a team matchup with identical ratings
 -- has the same probability sequences as a singles / doubles matchup with identical ratings
 perRackWinProbability (TeamMatchup (teamA, teamB)) =
@@ -144,10 +169,10 @@ pickWinner a b matchup = state $ \g ->
               then
                 matchupState {aWins = aWins matchupState + 1}
               else matchupState {bWins = bWins matchupState + 1}
-          winner =
-            if bWins nextState == 5
-              then Just (teamB nextState)
-              else if aWins nextState == 5 then Just (teamA nextState) else Nothing
+          winner
+            | bWins nextState == 5 = Just (teamB nextState)
+            | aWins nextState == 5 = Just (teamA nextState)
+            | otherwise = Nothing
        in case winner of
             Just t ->
               if t == a
@@ -174,8 +199,8 @@ runMosconi a b schedule =
     go (SimState {teamA, teamB, aWins, bWins, playerWinLoss}) (matchup : matchups) =
       do
         MatchupResult {winningTeam, winningPlayers, losingPlayers} <- pickWinner teamA teamB matchup
-        let withWins = foldMap (`recordWin` playerWinLoss) winningPlayers
-        let withWinsLosses = foldMap (`recordLoss` withWins) losingPlayers
+        let withWins' = foldl' recordWin playerWinLoss winningPlayers
+        let withWinsLosses' = foldl' recordLoss withWins' losingPlayers
         let nextState =
               if winningTeam == teamA
                 then
@@ -184,7 +209,7 @@ runMosconi a b schedule =
                         bWins,
                         teamA,
                         teamB,
-                        playerWinLoss = withWinsLosses
+                        playerWinLoss = withWinsLosses'
                       }
                   )
                 else
@@ -193,7 +218,7 @@ runMosconi a b schedule =
                         aWins,
                         teamA,
                         teamB,
-                        playerWinLoss = withWinsLosses
+                        playerWinLoss = withWinsLosses'
                       }
                   )
         go nextState matchups

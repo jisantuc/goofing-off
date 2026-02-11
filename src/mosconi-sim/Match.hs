@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Match
   ( Player (..),
@@ -13,7 +14,7 @@ module Match
 where
 
 import Control.Monad.Trans.State.Lazy (State, state)
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON, ToJSON (toJSON), parseJSON)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import System.Random.Stateful (RandomGen, randomR)
@@ -30,7 +31,20 @@ instance ToJSON Player
 
 data Team = Team Player Player Player Player Player deriving (Eq, Show, Generic)
 
-instance ToJSON Team
+instance ToJSON Team where
+  toJSON = toJSON . teamToList
+
+instance FromJSON Team where
+  parseJSON js =
+    parseJSON js
+      >>= ( \case
+              [p1, p2, p3, p4, p5] -> pure $ Team p1 p2 p3 p4 p5
+              players ->
+                let numPlayers = length players
+                 in if numPlayers < 5
+                      then fail "Too few players"
+                      else fail "Too many players"
+          )
 
 teamToList :: Team -> [Player]
 teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
@@ -38,6 +52,7 @@ teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
 data DoublesTeam = DoublesTeam Player Player deriving (Show, Generic)
 
 instance ToJSON DoublesTeam
+instance FromJSON DoublesTeam
 
 data Matchup
   = SinglesMatchup (Player, Player)
@@ -46,6 +61,7 @@ data Matchup
   deriving (Show, Generic)
 
 instance ToJSON Matchup
+instance FromJSON Matchup
 
 -- All players must play at least once in matches 2, 3, and 4.
 data Day1
@@ -58,6 +74,7 @@ data Day1
   deriving (Show, Generic)
 
 instance ToJSON Day1
+instance FromJSON Day1
 
 -- All players must play at least once in matches 7, 8, and 9.
 -- third/fourth/fifth match of the day
@@ -74,6 +91,7 @@ data Day2
   deriving (Generic, Show)
 
 instance ToJSON Day2
+instance FromJSON Day2
 
 -- All players must play at least once in matches 12, 13, and 14.
 -- that's the third/fourth/fifth match of the day
@@ -89,6 +107,7 @@ data Day3
   deriving (Generic, Show)
 
 instance ToJSON Day3
+instance FromJSON Day3
 
 -- |
 -- "Each player must play one singles match before playing again."
@@ -106,6 +125,7 @@ data Day4
   deriving (Generic, Show)
 
 instance ToJSON Day4
+instance FromJSON Day4
 
 -- |
 -- - One issue is, this isn't really foldable, so keeping track of
@@ -122,6 +142,7 @@ data Schedule
   deriving (Generic)
 
 instance ToJSON Schedule
+instance FromJSON Schedule
 
 shuffleTeam :: (RandomGen g) => Team -> State g Team
 shuffleTeam team = state $ \gen ->
@@ -151,7 +172,7 @@ exhaustiveMatchSeq teamA teamB =
     pure
       ( DoublesMatchup (DoublesTeam a1' a2', DoublesTeam b1' b2'),
         SinglesMatchup (a3', b3'),
-        DoublesMatchup ((DoublesTeam a4' a5'), (DoublesTeam b4' b5'))
+        DoublesMatchup (DoublesTeam a4' a5', DoublesTeam b4' b5')
       )
 
 makeDay1 :: (RandomGen g) => Team -> Team -> State g Day1
