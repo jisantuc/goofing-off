@@ -13,7 +13,7 @@
           compiler = "ghc910";
           haskellPackages = pkgs.haskell.packages.${compiler}.extend(self: super: {
             dataframe = dataframe.packages.${system}.default;
-            random = pkgs.haskell.packages.${compiler}.callHackage "random" "1.3.1" {};
+            random = pkgs.haskell.packages.${compiler}.random_1_3_1;
             time-compat = pkgs.haskell.lib.dontCheck super.time-compat;
           });
           devDependencies = with haskellPackages; [
