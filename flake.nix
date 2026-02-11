@@ -1,16 +1,21 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-25.11";
     utils.url = "github:numtide/flake-utils";
+    dataframe.url = "github:DataHaskell/dataframe";
+    nixpkgs.follows = "dataframe/nixpkgs";
   };
 
-  outputs = { nixpkgs, utils, ... }:
+  outputs = { nixpkgs, utils, dataframe, ... }:
     utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ]
       (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           compiler = "ghc910";
-          haskellPackages = pkgs.haskell.packages.${compiler};
+          haskellPackages = pkgs.haskell.packages.${compiler}.extend(self: super: {
+            dataframe = dataframe.packages.${system}.default;
+            random = pkgs.haskell.packages.${compiler}.callHackage "random" "1.3.1" {};
+            time-compat = pkgs.haskell.lib.dontCheck super.time-compat;
+          });
           devDependencies = with haskellPackages; [
             cabal-fmt
             cabal-gild
