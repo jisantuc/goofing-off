@@ -6,7 +6,7 @@ module Sim
   ( losingTeamMatchesWon,
     runMosconi,
     recordLoss,
-    recordWin
+    recordWin,
   )
 where
 
@@ -23,9 +23,8 @@ import Match
     scheduleToList,
     teamToList,
   )
+import Results (MosconiResult (..), MosconiTeam)
 import System.Random (RandomGen, SplitGen (..), randoms)
-import Results (MosconiTeam)
-import Results (MosconiResult(..))
 
 data SimState = SimState
   { aWins :: Int,

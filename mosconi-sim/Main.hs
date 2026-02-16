@@ -7,7 +7,6 @@ module Main (main) where
 import Control.Applicative (optional)
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (evalState)
-import ScheduleGen (makeSchedule)
 import Options.Applicative
   ( Parser,
     auto,
@@ -30,8 +29,9 @@ import Options.Applicative
 import Results
   ( MosconiTeam (..),
     ScheduleSummary (..),
-    SimSummary (..)
+    SimSummary (..),
   )
+import ScheduleGen (makeSchedule)
 import Sim (runMosconi)
 import Sim.IO (loadTeamFromJson, writeResults)
 import System.Random (getStdGen, mkStdGen)

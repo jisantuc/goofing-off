@@ -1,11 +1,8 @@
 module ScheduleGen (makeSchedule) where
 
 import Control.Monad.Trans.State (State, state)
-import Match (Matchup, Team(..), Day1(..), Day2(..), Day3(..), Day4(..), teamToList)
+import Match (Day1 (..), Day2 (..), Day3 (..), Day4 (..), DoublesTeam (..), Matchup (..), Schedule (..), Team (..), teamToList)
 import System.Random (RandomGen, randomR)
-import Match (Schedule(..))
-import Match (Matchup(..))
-import Match (DoublesTeam(..))
 
 shuffleTeam :: (RandomGen g) => Team -> State g Team
 shuffleTeam team = state $ \gen ->
