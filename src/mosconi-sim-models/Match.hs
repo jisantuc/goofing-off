@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Match
   ( Day1 (..),
@@ -6,7 +7,7 @@ module Match
     Day3 (..),
     Day4 (..),
     Player (..),
-    Schedule(..),
+    Schedule (..),
     DoublesTeam (..),
     Team (..),
     Matchup (..),
@@ -29,14 +30,25 @@ instance FromJSON Player
 
 instance ToJSON Player
 
-data Team = Team Player Player Player Player Player deriving (Eq, Show, Generic)
+data Team = Team
+  { p1 :: Player,
+    p2 :: Player,
+    p3 :: Player,
+    p4 :: Player,
+    p5 :: Player
+  }
+  deriving (Eq, Show, Generic)
+
+instance FromJSON Team
 
 instance ToJSON Team
 
 teamToList :: Team -> [Player]
-teamToList (Team p1 p2 p3 p4 p5) = [p1, p2, p3, p4, p5]
+teamToList (Team {p1, p2, p3, p4, p5}) = [p1, p2, p3, p4, p5]
 
-data DoublesTeam = DoublesTeam Player Player deriving (Show, Generic)
+data DoublesTeam = DoublesTeam {d1 :: Player, d2 :: Player} deriving (Show, Generic)
+
+instance FromJSON DoublesTeam
 
 instance ToJSON DoublesTeam
 
@@ -45,6 +57,8 @@ data Matchup
   | DoublesMatchup (DoublesTeam, DoublesTeam)
   | TeamMatchup (Team, Team)
   deriving (Show, Generic)
+
+instance FromJSON Matchup
 
 instance ToJSON Matchup
 
@@ -57,6 +71,8 @@ data Day1
     match4 :: Matchup
   }
   deriving (Show, Generic)
+
+instance FromJSON Day1
 
 instance ToJSON Day1
 
@@ -74,6 +90,8 @@ data Day2
   }
   deriving (Generic, Show)
 
+instance FromJSON Day2
+
 instance ToJSON Day2
 
 -- All players must play at least once in matches 12, 13, and 14.
@@ -88,6 +106,8 @@ data Day3
     match15 :: Matchup
   }
   deriving (Generic, Show)
+
+instance FromJSON Day3
 
 instance ToJSON Day3
 
@@ -106,6 +126,8 @@ data Day4
   }
   deriving (Generic, Show)
 
+instance FromJSON Day4
+
 instance ToJSON Day4
 
 -- |
@@ -116,11 +138,14 @@ instance ToJSON Day4
 -- - Maybe not exposing Schedule constructor would help with the unsafety?
 data Schedule
   = Schedule
-      Day1
-      Day2
-      Day3
-      Day4
+  { day1 :: Day1,
+    day2 :: Day2,
+    day3 :: Day3,
+    day4 :: Day4
+  }
   deriving (Generic)
+
+instance FromJSON Schedule
 
 instance ToJSON Schedule
 

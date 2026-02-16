@@ -37,6 +37,7 @@ library mosconi-sim-models
         import:           warnings
         exposed-modules:
                 Match
+                Results
         
         build-depends:
                 base         ^>=4.20
@@ -50,9 +51,11 @@ library mosconi-sim-models
 executable mosconi-sim-plots
         import:           warnings
         main-is:          Main.hs
-        -- other-modules:
+        other-modules:
+          Features
         -- other-extensions:
         build-depends:
+                , aeson
                 , base                  ^>=4.20
                 , dataframe
                 , mosconi-sim-models
@@ -68,6 +71,7 @@ executable mosconi-sim
         -- other-extensions:
         build-depends:
                 , mosconi-sim-lib
+                , mosconi-sim-models
                 , base                  ^>=4.20
                 , optparse-applicative
                 , random

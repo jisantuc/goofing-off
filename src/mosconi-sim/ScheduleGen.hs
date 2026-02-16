@@ -80,8 +80,8 @@ makeDay4 teamA teamB = do
 
 makeSchedule :: (RandomGen g) => Team -> Team -> State g Schedule
 makeSchedule teamA teamB = do
-  day1 <- makeDay1 teamA teamB
-  day2 <- makeDay2 teamA teamB
-  day3 <- makeDay3 teamA teamB
-  day4 <- makeDay4 teamA teamB
-  pure $ Schedule day1 day2 day3 day4
+  day1' <- makeDay1 teamA teamB
+  day2' <- makeDay2 teamA teamB
+  day3' <- makeDay3 teamA teamB
+  day4' <- makeDay4 teamA teamB
+  pure $ Schedule day1' day2' day3' day4'

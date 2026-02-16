@@ -6,69 +6,26 @@ module Sim
   ( losingTeamMatchesWon,
     runMosconi,
     recordLoss,
-    recordWin,
-    MosconiResult,
-    MosconiTeam (..),
-    ScheduleSummary (..),
-    SimSummary (..),
+    recordWin
   )
 where
 
 import Control.Lens (at, (%~), (&))
 import Control.Monad.Trans.State.Lazy (State, state)
-import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid (Sum (..))
-import GHC.Generics (Generic)
 import Match
   ( DoublesTeam (..),
     Matchup (..),
     Player (..),
     Schedule,
-    Team,
     scheduleToList,
     teamToList,
   )
 import System.Random (RandomGen, SplitGen (..), randoms)
-
-data MosconiTeam = USA Team | Europe Team deriving (Eq, Generic, Show)
-
-instance ToJSON MosconiTeam
-
-instance FromJSON MosconiTeam
-
-data MosconiResult = MosconiResult
-  { winner :: MosconiTeam,
-    losingTeamMatchesWon :: Int,
-    playerRecords :: [(Player, Int, Int)]
-  }
-  deriving (Generic, Show)
-
-instance ToJSON MosconiResult
-
-instance FromJSON MosconiResult
-
-data ScheduleSummary = ScheduleSummary
-  { schedule :: Schedule,
-    results :: [MosconiResult]
-  }
-  deriving (Generic)
-
-instance ToJSON ScheduleSummary
-
-instance FromJSON ScheduleSummary
-
-data SimSummary = SimSummary
-  { teamUsa :: Team,
-    teamEurope :: Team,
-    summaries :: [ScheduleSummary]
-  }
-  deriving (Generic)
-
-instance ToJSON SimSummary
-
-instance FromJSON SimSummary
+import Results (MosconiTeam)
+import Results (MosconiResult(..))
 
 data SimState = SimState
   { aWins :: Int,

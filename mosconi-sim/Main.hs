@@ -27,12 +27,12 @@ import Options.Applicative
     value,
     (<**>),
   )
-import Sim
+import Results
   ( MosconiTeam (..),
     ScheduleSummary (..),
-    SimSummary (..),
-    runMosconi,
+    SimSummary (..)
   )
+import Sim (runMosconi)
 import Sim.IO (loadTeamFromJson, writeResults)
 import System.Random (getStdGen, mkStdGen)
 
