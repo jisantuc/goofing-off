@@ -1,7 +1,7 @@
 {
   inputs = {
     utils.url = "github:numtide/flake-utils";
-    dataframe.url = "github:DataHaskell/dataframe";
+    dataframe.url = "github:datahaskell/dataframe";
     nixpkgs.follows = "dataframe/nixpkgs";
   };
 
@@ -13,8 +13,6 @@
           compiler = "ghc910";
           haskellPackages = pkgs.haskell.packages.${compiler}.extend(self: super: {
             dataframe = dataframe.packages.${system}.default;
-            random = pkgs.haskell.packages.${compiler}.random_1_3_1;
-            time-compat = pkgs.haskell.lib.dontCheck super.time-compat;
           });
           devDependencies = with haskellPackages; [
             cabal-fmt
@@ -25,7 +23,7 @@
             hlint
             ormolu
           ];
-          packages = ps: [ (ps.callCabal2nix "mosconi-sim" ./. { }) ];
+          packages = ps: [ (ps.callCabal2nix "goofing-off" ./. { }) ];
         in
         {
           devShells.default = haskellPackages.shellFor {

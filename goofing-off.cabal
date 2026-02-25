@@ -80,3 +80,25 @@ executable mosconi-sim
         hs-source-dirs:   mosconi-sim
         default-language: Haskell2010
 
+library plotting-survey
+        import:           warnings
+        exposed-modules:
+          ExampleData
+          PlotSurvey.Scatter
+
+        build-depends:
+                base         ^>=4.20
+                , transformers
+                , chart-svg
+                , Chart-cairo
+                , Chart
+                , dataframe
+                , granite
+                , hvega
+                -- for chart-svg
+                , optics-core
+                , random
+                , text
+
+        hs-source-dirs:   src/plotting-survey
+        default-language: Haskell2010
