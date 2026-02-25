@@ -2,7 +2,7 @@ module Sim.IO (loadTeamFromJson, readResults, writeResults) where
 
 import Data.Aeson (eitherDecodeFileStrict, encodeFile)
 import Match (Team (..))
-import Sim (SimSummary)
+import Results (SimSummary)
 
 loadTeamFromJson :: FilePath -> IO (Either String Team)
 loadTeamFromJson =

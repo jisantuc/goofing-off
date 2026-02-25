@@ -7,7 +7,7 @@ module Main (main) where
 import Control.Applicative (optional)
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State (evalState)
-import Match (makeSchedule)
+import Match (Player (..), Team (..))
 import Options.Applicative
   ( Parser,
     auto,
@@ -27,12 +27,13 @@ import Options.Applicative
     value,
     (<**>),
   )
-import Sim
+import Results
   ( MosconiTeam (..),
     ScheduleSummary (..),
     SimSummary (..),
-    runMosconi,
   )
+import ScheduleGen (makeSchedule)
+import Sim (runMosconi)
 import Sim.IO (loadTeamFromJson, writeResults)
 import System.Random (getStdGen, mkStdGen)
 
@@ -51,7 +52,8 @@ data MosconiSimConfig = MosconiSimConfig
   { teamPaths :: TeamPaths,
     seed :: Maybe Int,
     outFile :: FilePath,
-    simMode :: SimMode
+    simMode :: SimMode,
+    ratingOverride :: Maybe Int
   }
   deriving (Show)
 
@@ -78,6 +80,9 @@ outFileParser =
 seedParser :: Parser (Maybe Int)
 seedParser = optional $ option auto (long "seed" <> metavar "SEED")
 
+ratingOverrideParser :: Parser (Maybe Int)
+ratingOverrideParser = optional $ option auto (long "rating-override" <> metavar "CONST_RATING")
+
 singleScheduleSimParser :: Parser MosconiSimConfig
 singleScheduleSimParser =
   MosconiSimConfig
@@ -85,6 +90,7 @@ singleScheduleSimParser =
     <*> seedParser
     <*> outFileParser
     <*> (Single <$> numTrialsPerScheduleParser)
+    <*> ratingOverrideParser
 
 manySchedulesSimParser :: Parser MosconiSimConfig
 manySchedulesSimParser =
@@ -102,6 +108,7 @@ manySchedulesSimParser =
                   <> showDefault
               )
         )
+    <*> ratingOverrideParser
 
 -- options:
 -- --output FILE to write results to a file; where "results" is something like schedule hash + USA win rate + USA mean racks won
@@ -110,34 +117,41 @@ manySchedulesSimParser =
 main :: IO ()
 main =
   execParser opts >>= \case
-    MosconiSimConfig {teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath}, outFile, seed, simMode} -> do
-      teamUsaParseResult <- loadTeamFromJson teamUSAJsonFilePath
-      teamUsa <-
-        either
-          (\err -> fail ("Could not parse Team USA: " <> err))
-          (\t -> pure t)
-          teamUsaParseResult
-      teamEuropeParseResult <- loadTeamFromJson teamEuropeJsonFilePath
-      teamEurope <-
-        either
-          (\err -> fail ("Could not parse Team Europe: " <> err))
-          (\t -> pure t)
-          teamEuropeParseResult
-      stdGen <- maybe getStdGen (pure . mkStdGen) seed
-      let (nTrials, nSchedules) = case simMode of
-            Single {trials} -> (trials, 1)
-            Many {trials, schedules} -> (trials, schedules)
-      let results =
-            SimSummary teamUsa teamEurope $
-              ( evalState
-                  ( replicateM nSchedules $ do
-                      schedule <- makeSchedule teamUsa teamEurope
-                      mosconiResults <- replicateM nTrials $ runMosconi (USA teamUsa) (Europe teamEurope) schedule
-                      pure (ScheduleSummary schedule mosconiResults)
-                  )
-                  stdGen
-              )
-      writeResults outFile results
+    MosconiSimConfig
+      { teamPaths = TeamPaths {teamUSAJsonFilePath, teamEuropeJsonFilePath},
+        outFile,
+        seed,
+        simMode,
+        ratingOverride
+      } -> do
+        teamUsaParseResult <- loadTeamFromJson teamUSAJsonFilePath
+        teamUsa <-
+          overrideRatings ratingOverride
+            <$> either
+              (\err -> fail ("Could not parse Team USA: " <> err))
+              (\t -> pure t)
+              teamUsaParseResult
+        teamEuropeParseResult <- loadTeamFromJson teamEuropeJsonFilePath
+        teamEurope <-
+          either
+            (\err -> fail ("Could not parse Team Europe: " <> err))
+            (\t -> pure t)
+            teamEuropeParseResult
+        stdGen <- maybe getStdGen (pure . mkStdGen) seed
+        let (nTrials, nSchedules) = case simMode of
+              Single {trials} -> (trials, 1)
+              Many {trials, schedules} -> (trials, schedules)
+        let results =
+              SimSummary teamUsa teamEurope $
+                ( evalState
+                    ( replicateM nSchedules $ do
+                        schedule <- makeSchedule teamUsa teamEurope
+                        mosconiResults <- replicateM nTrials $ runMosconi (USA teamUsa) (Europe teamEurope) schedule
+                        pure (ScheduleSummary schedule mosconiResults)
+                    )
+                    stdGen
+                )
+        writeResults outFile results
   where
     cmdParser =
       hsubparser
@@ -150,3 +164,12 @@ main =
         ( fullDesc
             <> progDesc "Simulate Mosconi outcomes based on 2025 rules for whatever teams you can imagine"
         )
+    overrideRatings maybeOverride team@(Team p1 p2 p3 p4 p5) = case maybeOverride of
+      Just override ->
+        Team
+          (p1 {rating = override})
+          (p2 {rating = override})
+          (p3 {rating = override})
+          (p4 {rating = override})
+          (p5 {rating = override})
+      Nothing -> team

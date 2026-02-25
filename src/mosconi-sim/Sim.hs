@@ -7,68 +7,24 @@ module Sim
     runMosconi,
     recordLoss,
     recordWin,
-    MosconiResult,
-    MosconiTeam (..),
-    ScheduleSummary (..),
-    SimSummary (..),
   )
 where
 
 import Control.Lens (at, (%~), (&))
 import Control.Monad.Trans.State.Lazy (State, state)
-import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid (Sum (..))
-import GHC.Generics (Generic)
 import Match
   ( DoublesTeam (..),
     Matchup (..),
     Player (..),
     Schedule,
-    Team,
     scheduleToList,
     teamToList,
   )
-import System.Random (RandomGen, randoms, split)
-
-data MosconiTeam = USA Team | Europe Team deriving (Eq, Generic, Show)
-
-instance ToJSON MosconiTeam
-
-instance FromJSON MosconiTeam
-
-data MosconiResult = MosconiResult
-  { winner :: MosconiTeam,
-    losingTeamMatchesWon :: Int,
-    playerRecords :: [(Player, Int, Int)]
-  }
-  deriving (Generic, Show)
-
-instance ToJSON MosconiResult
-
-instance FromJSON MosconiResult
-
-data ScheduleSummary = ScheduleSummary
-  { schedule :: Schedule,
-    results :: [MosconiResult]
-  }
-  deriving (Generic)
-
-instance ToJSON ScheduleSummary
-
-instance FromJSON ScheduleSummary
-
-data SimSummary = SimSummary
-  { teamUsa :: Team,
-    teamEurope :: Team,
-    summaries :: [ScheduleSummary]
-  }
-  deriving (Generic)
-
-instance ToJSON SimSummary
-
-instance FromJSON SimSummary
+import Results (MosconiResult (..), MosconiTeam)
+import System.Random (RandomGen, SplitGen (..), randoms)
 
 data SimState = SimState
   { aWins :: Int,
@@ -152,9 +108,9 @@ perRackWinProbability (TeamMatchup (teamA, teamB)) =
       bRatings = fromIntegral . rating <$> teamToList teamB
    in cycle $ zipWith winProbabilityForRatings aRatings bRatings
 
-pickWinner :: (RandomGen g) => MosconiTeam -> MosconiTeam -> Matchup -> State g MatchupResult
+pickWinner :: (RandomGen g, SplitGen g) => MosconiTeam -> MosconiTeam -> Matchup -> State g MatchupResult
 pickWinner a b matchup = state $ \g ->
-  let (genForThisMatch, genForRest) = split g
+  let (genForThisMatch, genForRest) = splitGen g
    in go genForRest (initSimState a b) (zip (perRackWinProbability matchup) (randoms genForThisMatch))
   where
     (aPlayers, bPlayers) = case matchup of
@@ -183,7 +139,7 @@ pickWinner a b matchup = state $ \g ->
               go nextGenerator nextState xs
 
 -- this is the go call with evaluating each match and deciding whether to stop/go
-runMosconi :: (RandomGen g) => MosconiTeam -> MosconiTeam -> Schedule -> State g MosconiResult
+runMosconi :: (RandomGen g, SplitGen g) => MosconiTeam -> MosconiTeam -> Schedule -> State g MosconiResult
 runMosconi a b schedule =
   go (initSimState a b) (scheduleToList schedule)
   where
