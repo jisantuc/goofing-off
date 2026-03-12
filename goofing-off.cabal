@@ -85,6 +85,7 @@ library plotting-survey
         exposed-modules:
           ExampleData
           PlotSurvey.Scatter
+          PlotSurvey.ScatterConfig
 
         build-depends:
                 base         ^>=4.20
