@@ -26,7 +26,7 @@ pointsDf size = do
         ("y", D.fromList y)
       ]
 
-type LabeledDfSchema = '[DT.Column "x" Double, DT.Column "y" Double, DT.Column "tag" Char]
+type LabeledDfSchema = '[DT.Column "x" Double, DT.Column "y" Double, DT.Column "tag" Char, DT.Column "idx" Int]
 
 labeledPointsDf :: (RandomGen g, Monad m) => Int -> StateT g m (DT.TypedDataFrame LabeledDfSchema)
 labeledPointsDf size = do
@@ -38,5 +38,6 @@ labeledPointsDf size = do
       D.fromNamedColumns
         [ ("x", D.fromList x),
           ("y", D.fromList y),
-          ("tag", D.fromList tag)
+          ("tag", D.fromList tag),
+          ("idx", D.fromList @Int $ (fst <$>) $ zip [1 ..] x)
         ]
