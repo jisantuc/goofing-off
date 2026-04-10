@@ -24,7 +24,7 @@ import Match
     teamToList,
   )
 import Results (MosconiResult (..), MosconiTeam)
-import System.Random (RandomGen, SplitGen (..), randoms)
+import System.Random (RandomGen, randoms, split)
 
 data SimState = SimState
   { aWins :: Int,
@@ -108,9 +108,9 @@ perRackWinProbability (TeamMatchup (teamA, teamB)) =
       bRatings = fromIntegral . rating <$> teamToList teamB
    in cycle $ zipWith winProbabilityForRatings aRatings bRatings
 
-pickWinner :: (RandomGen g, SplitGen g) => MosconiTeam -> MosconiTeam -> Matchup -> State g MatchupResult
+pickWinner :: (RandomGen g) => MosconiTeam -> MosconiTeam -> Matchup -> State g MatchupResult
 pickWinner a b matchup = state $ \g ->
-  let (genForThisMatch, genForRest) = splitGen g
+  let (genForThisMatch, genForRest) = split g
    in go genForRest (initSimState a b) (zip (perRackWinProbability matchup) (randoms genForThisMatch))
   where
     (aPlayers, bPlayers) = case matchup of
@@ -139,7 +139,7 @@ pickWinner a b matchup = state $ \g ->
               go nextGenerator nextState xs
 
 -- this is the go call with evaluating each match and deciding whether to stop/go
-runMosconi :: (RandomGen g, SplitGen g) => MosconiTeam -> MosconiTeam -> Schedule -> State g MosconiResult
+runMosconi :: (RandomGen g) => MosconiTeam -> MosconiTeam -> Schedule -> State g MosconiResult
 runMosconi a b schedule =
   go (initSimState a b) (scheduleToList schedule)
   where
